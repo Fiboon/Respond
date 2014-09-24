@@ -1,16 +1,19 @@
-/* Respond.js: min/max-width media query polyfill. (c) Scott Jehl. MIT Lic. j.mp/respondjs  */
+/* 
+	Respond.js: min/max-width media query polyfill. (c) Scott Jehl. MIT Lic. j.mp/respondjs  
+	**respond.js
+	add a way to make callbacks by Fiboon 2014.9.24
+*/
 (function( w ){
-
 	"use strict";
 
-	//exposed namespace
+	//暴露命名空间
 	var respond = {};
 	w.respond = respond;
 
-	//define update even in native-mq-supporting browsers, to avoid errors
+	//定义update方法 即使是在原生支持media query的浏览器中, 也为了避免错误
 	respond.update = function(){};
 
-	//define ajax obj
+	//定义ajax对象
 	var requestQueue = [],
 		xmlHttp = (function() {
 			var xmlhttpmethod = false;
@@ -63,16 +66,17 @@
 		minmaxwh: /\(\s*m(in|ax)\-(height|width)\s*:\s*(\s*[0-9\.]+)(px|em)\s*\)/gi,
 		other: /\([^\)]*\)/g
 	};
+	respond.cbk = []; //media query样式渲染完后回调
 
 	//expose media query support flag for external use
 	respond.mediaQueriesSupported = w.matchMedia && w.matchMedia( "only all" ) !== null && w.matchMedia( "only all" ).matches;
 
-	//if media queries are supported, exit here
+	//如果支持media query,在此结束
 	if( respond.mediaQueriesSupported ){
 		return;
 	}
 
-	//define vars
+	//定义变量
 	var doc = w.document,
 		docElem = doc.documentElement,
 		mediastyles = [],
@@ -219,7 +223,7 @@
 				}
 			}
 		},
-		//find media blocks in css text, convert to style blocks
+		//在css文件中查找media块，转换成style块
 		translate = function( styles, href, media ){
 			var qs = styles.replace( respond.regex.comments, '' )
 					.replace( respond.regex.keyframes, '' )
@@ -282,23 +286,27 @@
 			applyMedia();
 		},
 
-		//recurse through request queue, get css text
+		//通过递归方式请求队列并获取css文本
 		makeRequests = function(){
 			if( requestQueue.length ){
 				var thisRequest = requestQueue.shift();
 
 				ajax( thisRequest.href, function( styles ){
-					translate( styles, thisRequest.href, thisRequest.media );
+					translate( styles, thisRequest.href, thisRequest.media );//在css文件中查找media块，转换成style块
 					parsedSheets[ thisRequest.href ] = true;
 
 					// by wrapping recursive function call in setTimeout
 					// we prevent "Stack overflow" error in IE7
 					w.setTimeout(function(){ makeRequests(); },0);
 				} );
+			}else{ //队列内容全部执行完后回调
+				for(var i = 0; i < respond.cbk.length; i++){
+					respond.cbk[i]();
+				}
 			}
 		},
 
-		//loop stylesheets, send text content to translate
+		//循环样式表，传递文本内容，用于转换（填充队列requestQueue，并执行makeRequests发起ajax请求）
 		ripCSS = function(){
 
 			for( var i = 0; i < links.length; i++ ){
